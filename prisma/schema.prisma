@@ -1,0 +1,173 @@
+// Ishikawa App — Petrowax México / Mesa de Control
+// Postgres (Neon). Jerarquía: Analysis -> Cause -> SubCause -> SubSubCause
+// Clave del sistema: Cause.rootCauseId liga al catálogo canónico (RootCause),
+// que es lo que permite contar recurrencias ENTRE análisis.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN    // Mesa de Control: da de alta usuarios, aprueba catálogo, ve todo
+  ANALYST  // captura y edita sus análisis
+  AUDITOR  // solo lectura + puede objetar causas
+}
+
+enum Estado {
+  SUPUESTA
+  VERIFICADA
+}
+
+enum Categoria {
+  MANO_DE_OBRA
+  METODO
+  MAQUINA
+  MATERIAL
+  MEDICION
+  MEDIO_AMBIENTE
+}
+
+enum AnalysisStatus {
+  BORRADOR
+  EN_REVISION
+  CERRADO
+}
+
+enum RootCauseStatus {
+  PROPUESTA // creada por un analista, pendiente de aprobación del admin
+  APROBADA  // canónica: cuenta para recurrencia
+  RECHAZADA
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // hash bcrypt — nunca texto plano
+  role      Role     @default(ANALYST)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  analyses          Analysis[]  @relation("AnalysisOwner")
+  logs              AuditLog[]
+  rootCausesCreated RootCause[] @relation("RootCauseCreator")
+
+  @@map("users")
+}
+
+// ---------- CATÁLOGO DE CAUSAS RAÍZ (el apartado nuevo) ----------
+// Una entrada canónica por causa raíz real. Las causas de cada análisis
+// se LIGAN aquí. Sin esto, "Falta de capacitación" y "falta de capacitacion"
+// serían dos cosas distintas y el conteo de recurrencia mentiría.
+model RootCause {
+  id          String          @id @default(cuid())
+  nombre      String          @unique // texto canónico
+  descripcion String?
+  categoria   Categoria // categoría 6M sugerida
+  status      RootCauseStatus @default(PROPUESTA)
+
+  createdById String
+  createdBy   User   @relation("RootCauseCreator", fields: [createdById], references: [id])
+
+  causes    Cause[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("root_causes")
+}
+
+model Analysis {
+  id            String         @id @default(cuid())
+  folio         String         @unique // FO-PETRO-DGA-###
+  proceso       String // línea / proceso (ej. Llenado línea 2)
+  efecto        String // cabeza del pescado: concreto y medible
+  participantes String?
+  fecha         DateTime       @default(now())
+  status        AnalysisStatus @default(BORRADOR)
+
+  ownerId String
+  owner   User   @relation("AnalysisOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  causes Cause[]
+  logs   AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("analyses")
+}
+
+model Cause {
+  id          String    @id @default(cuid())
+  categoria   Categoria
+  texto       String // redacción libre en este análisis
+  estado      Estado    @default(SUPUESTA)
+  evidencia   String? // OBLIGATORIA si estado = VERIFICADA (validado con Zod en el servidor)
+  accion      String? // solo tiene sentido si VERIFICADA
+  responsable String?
+  fechaLimite DateTime?
+  orden       Int       @default(0)
+
+  analysisId String
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  // liga al catálogo -> habilita el conteo de recurrencia
+  rootCauseId String?
+  rootCause   RootCause? @relation(fields: [rootCauseId], references: [id], onDelete: SetNull)
+
+  subCauses SubCause[]
+
+  @@index([analysisId, categoria])
+  @@index([rootCauseId])
+  @@map("causes")
+}
+
+model SubCause {
+  id    String @id @default(cuid())
+  texto String
+  orden Int    @default(0)
+
+  causeId String
+  cause   Cause  @relation(fields: [causeId], references: [id], onDelete: Cascade)
+
+  subSubCauses SubSubCause[]
+
+  @@index([causeId])
+  @@map("sub_causes")
+}
+
+model SubSubCause {
+  id    String @id @default(cuid())
+  texto String
+  orden Int    @default(0)
+
+  subCauseId String
+  subCause   SubCause @relation(fields: [subCauseId], references: [id], onDelete: Cascade)
+
+  @@index([subCauseId])
+  @@map("sub_sub_causes")
+}
+
+// Trazabilidad: la razón real de migrar de un HTML suelto a una app.
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // CREATE_ANALYSIS | VERIFY_CAUSE | LINK_ROOT_CAUSE | CLOSE_ANALYSIS ...
+  detail    String?
+  createdAt DateTime @default(now())
+
+  analysisId String
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId, createdAt])
+  @@map("audit_logs")
+}
