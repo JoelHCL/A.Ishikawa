@@ -87,3 +87,18 @@ export const rootCauseSchema = z.object({
 
 export type AnalysisInput = z.infer<typeof analysisSchema>;
 export type CauseInput = z.infer<typeof causeSchema>;
+
+// --- Perfil propio y administración de usuarios ---
+export const updateProfileSchema = z.object({
+  name: z.string().min(2, "Nombre demasiado corto.").optional(),
+  // Para cambiar la propia contraseña se exige la actual.
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(10, "La nueva contraseña debe tener mínimo 10 caracteres.").optional(),
+}).refine((d) => !d.newPassword || (d.currentPassword?.length ?? 0) > 0, {
+  message: "Para cambiar la contraseña, escribe también la actual.",
+  path: ["currentPassword"],
+});
+
+export const adminUpdateUserSchema = z.object({
+  active: z.boolean(),
+});

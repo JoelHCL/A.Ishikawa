@@ -15,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <nav className="flex flex-wrap items-center gap-2 text-sm">
           <Link className="btn" href="/dashboard">Análisis</Link>
           <Link className="btn" href="/recurrentes">Causas recurrentes</Link>
+          <Link className="btn" href="/perfil">Mi perfil</Link>
           {s?.role === "ADMIN" && <Link className="btn" href="/admin">Admin</Link>}
           <ThemeToggle />
           <LogoutButton />
