@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { CATEGORIA_LABEL, CATEGORIAS } from "@/lib/validation";
 
-type User = { id: string; email: string; name: string; role: string; active: boolean };
+type User = { id: string; email: string; name: string; role: string; active: boolean; lockedUntil: string | null; failedAttempts: number };
 type Root = { id: string; nombre: string; categoria: string; status: string; usos: number };
 
 export default function Admin() {
@@ -32,6 +32,12 @@ export default function Admin() {
   async function toggleActive(u: User) {
     setError(null);
     try { await api.patch(`/api/users/${u.id}`, { active: !u.active }); reload(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  async function unlock(u: User) {
+    setError(null);
+    try { await api.patch(`/api/users/${u.id}`, { unlock: true }); reload(); }
     catch (e: any) { setError(e.message); }
   }
 
@@ -81,7 +87,8 @@ export default function Admin() {
         <h2 className="mb-1 font-semibold">Usuarios</h2>
         <p className="mb-3 text-sm text-[#8A96A0]">
           No hay registro público: las cuentas se crean aquí. Desactivar corta el acceso sin
-          borrar el historial de sus análisis.
+          borrar el historial de sus análisis. Tras 5 intentos fallidos la cuenta se bloquea
+          15 minutos; puedes desbloquearla aquí.
         </p>
         <div className="grid gap-2 md:grid-cols-5">
           <input className="input" placeholder="Correo" value={nu.email}
@@ -115,6 +122,11 @@ export default function Admin() {
                   <span className={u.active ? "text-[#0F6E56]" : "text-[#A32D2D]"}>
                     {u.active ? "Activo" : "Inactivo"}
                   </span>
+                  {u.lockedUntil && new Date(u.lockedUntil) > new Date() && (
+                    <span className="ml-2 rounded-full bg-[#FBEBEB] px-2 py-0.5 text-xs font-bold text-[#A32D2D]">
+                      BLOQUEADO
+                    </span>
+                  )}
                 </td>
                 <td className="p-2">
                   <div className="flex gap-2">
@@ -124,6 +136,11 @@ export default function Admin() {
                     <button className="btn py-1 text-xs" onClick={() => resetPass(u)}>
                       Resetear contraseña
                     </button>
+                    {u.lockedUntil && new Date(u.lockedUntil) > new Date() && (
+                      <button className="btn py-1 text-xs" onClick={() => unlock(u)}>
+                        Desbloquear
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

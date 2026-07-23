@@ -53,6 +53,12 @@ model User {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  // Anti fuerza bruta. Se guarda en la BD (no en memoria) porque en Vercel
+  // cada invocación puede correr en una instancia distinta.
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastLoginAt    DateTime?
+
   analyses          Analysis[]  @relation("AnalysisOwner")
   logs              AuditLog[]
   rootCausesCreated RootCause[] @relation("RootCauseCreator")

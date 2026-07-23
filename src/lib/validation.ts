@@ -100,5 +100,8 @@ export const updateProfileSchema = z.object({
 });
 
 export const adminUpdateUserSchema = z.object({
-  active: z.boolean(),
+  active: z.boolean().optional(),
+  unlock: z.boolean().optional(), // quita el bloqueo por intentos fallidos
+}).refine((d) => d.active !== undefined || d.unlock !== undefined, {
+  message: "Nada que actualizar.",
 });

@@ -27,7 +27,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const temp = tempPassword();
     await prisma.user.update({
       where: { id: params.id },
-      data: { password: await bcrypt.hash(temp, 12) },
+      // Al resetear también se limpia el bloqueo por intentos fallidos.
+      data: { password: await bcrypt.hash(temp, 12), failedAttempts: 0, lockedUntil: null },
     });
     // Se devuelve en claro SOLO en esta respuesta. No se registra en ningún log.
     return ok({ email: target.email, tempPassword: temp });
