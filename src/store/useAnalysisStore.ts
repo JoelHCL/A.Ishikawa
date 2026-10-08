@@ -18,6 +18,7 @@ export type Cause = {
   responsable?: string | null;
   fechaLimite?: string | null;
   rootCauseId?: string | null;
+  areaId?: string | null;
   subCauses: Sub[];
 };
 export type Analysis = {
@@ -81,6 +82,7 @@ export const useAnalysisStore = create<State>((set, get) => ({
             responsable: c.responsable,
             fechaLimite: c.fechaLimite ? String(c.fechaLimite).slice(0, 10) : null,
             rootCauseId: c.rootCauseId,
+            areaId: c.areaId,
             subCauses: (c.subCauses ?? []).map((s: any) => ({
               id: s.id,
               texto: s.texto,

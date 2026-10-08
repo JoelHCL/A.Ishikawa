@@ -12,6 +12,7 @@ export async function GET() {
       select: {
         id: true, email: true, name: true, role: true, active: true,
         createdAt: true, lockedUntil: true, failedAttempts: true, lastLoginAt: true,
+        twoFactorEnabled: true,
       },
       orderBy: { createdAt: "asc" },
     });

@@ -25,6 +25,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       patch.lockedUntil = null;
       patch.failedAttempts = 0;
     }
+    if (data.reset2fa) {
+      // Borra el 2FA: el usuario volverá a configurar (nuevo QR) en su próximo login.
+      patch.twoFactorSecret = null;
+      patch.twoFactorEnabled = false;
+    }
 
     const updated = await prisma.user.update({
       where: { id: params.id },

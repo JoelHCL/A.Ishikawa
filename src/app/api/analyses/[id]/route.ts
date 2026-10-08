@@ -31,6 +31,7 @@ export async function GET(_req: Request, { params }: Ctx) {
           orderBy: { orden: "asc" },
           include: {
             rootCause: { select: { id: true, nombre: true, status: true } },
+            area: { select: { id: true, nombre: true } },
             subCauses: {
               orderBy: { orden: "asc" },
               include: { subSubCauses: { orderBy: { orden: "asc" } } },
@@ -89,6 +90,7 @@ export async function PUT(req: Request, { params }: Ctx) {
             responsable: c.estado === "VERIFICADA" ? c.responsable ?? null : null,
             fechaLimite: c.fechaLimite ? new Date(c.fechaLimite) : null,
             rootCauseId: c.rootCauseId ?? null,
+            areaId: c.areaId ?? null,
             orden: i,
             subCauses: {
               create: c.subCauses.map((sc: (typeof c.subCauses)[number], j: number) => ({

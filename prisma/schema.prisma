@@ -13,9 +13,9 @@ datasource db {
 }
 
 enum Role {
-  ADMIN    // Mesa de Control: da de alta usuarios, aprueba catálogo, ve todo
-  ANALYST  // captura y edita sus análisis
-  AUDITOR  // solo lectura + puede objetar causas
+  ADMIN // Mesa de Control: da de alta usuarios, aprueba catálogo, ve todo
+  ANALYST // captura y edita sus análisis
+  AUDITOR // solo lectura + puede objetar causas
 }
 
 enum Estado {
@@ -40,7 +40,7 @@ enum AnalysisStatus {
 
 enum RootCauseStatus {
   PROPUESTA // creada por un analista, pendiente de aprobación del admin
-  APROBADA  // canónica: cuenta para recurrencia
+  APROBADA // canónica: cuenta para recurrencia
   RECHAZADA
 }
 
@@ -48,7 +48,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
-  password  String   // hash bcrypt — nunca texto plano
+  password  String // hash bcrypt — nunca texto plano
   role      Role     @default(ANALYST)
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -58,6 +58,10 @@ model User {
   failedAttempts Int       @default(0)
   lockedUntil    DateTime?
   lastLoginAt    DateTime?
+
+  // 2FA (TOTP, app autenticadora). El secreto se cifra en reposo (ver lib/twofa.ts).
+  twoFactorSecret  String?   // secreto TOTP cifrado; null = aún no configurado
+  twoFactorEnabled Boolean   @default(false) // true una vez que confirmó el primer código
 
   analyses          Analysis[]  @relation("AnalysisOwner")
   logs              AuditLog[]
@@ -111,6 +115,21 @@ model Analysis {
   @@map("analyses")
 }
 
+// Catálogo CERRADO de áreas responsables. Igual que RootCause: evita que
+// "Producción", "produccion" y "Prod." se cuenten como tres áreas distintas.
+// Lo administra Mesa de Control desde /admin.
+model Area {
+  id        String   @id @default(cuid())
+  nombre    String   @unique
+  activa    Boolean  @default(true)
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  causes Cause[]
+
+  @@map("areas")
+}
+
 model Cause {
   id          String    @id @default(cuid())
   categoria   Categoria
@@ -129,10 +148,16 @@ model Cause {
   rootCauseId String?
   rootCause   RootCause? @relation(fields: [rootCauseId], references: [id], onDelete: SetNull)
 
+  // área ORGANIZACIONAL responsable de trabajar la causa (lo pidió Contraloría).
+  // Es distinta de "responsable" (una persona): el área no rota de puesto.
+  areaId String?
+  area   Area?   @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
   subCauses SubCause[]
 
   @@index([analysisId, categoria])
   @@index([rootCauseId])
+  @@index([areaId])
   @@map("causes")
 }
 

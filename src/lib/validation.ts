@@ -55,6 +55,7 @@ export const causeSchema = z
     responsable: z.string().nullable().optional(),
     fechaLimite: z.string().nullable().optional(),
     rootCauseId: z.string().nullable().optional(),
+    areaId: z.string().nullable().optional(),
     subCauses: z.array(subCauseSchema).default([]),
   })
   // CANDADO 2, ahora aplicado en el servidor y no por buena voluntad:
@@ -101,7 +102,13 @@ export const updateProfileSchema = z.object({
 
 export const adminUpdateUserSchema = z.object({
   active: z.boolean().optional(),
-  unlock: z.boolean().optional(), // quita el bloqueo por intentos fallidos
-}).refine((d) => d.active !== undefined || d.unlock !== undefined, {
+  unlock: z.boolean().optional(),  // quita el bloqueo por intentos fallidos
+  reset2fa: z.boolean().optional(), // borra el 2FA para que reconfigure (celular perdido)
+}).refine((d) => d.active !== undefined || d.unlock !== undefined || d.reset2fa !== undefined, {
   message: "Nada que actualizar.",
+});
+
+export const areaSchema = z.object({
+  nombre: z.string().min(2, "Nombre de área requerido."),
+  orden: z.number().int().optional(),
 });

@@ -7,15 +7,18 @@ import CauseEditor from "@/components/CauseEditor";
 import { api } from "@/lib/api";
 
 export type RootCauseOption = { id: string; nombre: string; categoria: string; usos: number };
+export type AreaOption = { id: string; nombre: string };
 
 export default function AnalysisPage({ params }: { params: { id: string } }) {
   const { analysis, load, setHeader, save, saving, error, dirty, addCause } = useAnalysisStore();
   const [expanded, setExpanded] = useState<Set<Categoria>>(new Set());
   const [roots, setRoots] = useState<RootCauseOption[]>([]);
+  const [areas, setAreas] = useState<AreaOption[]>([]);
 
   useEffect(() => {
     load(params.id);
     api.get<RootCauseOption[]>("/api/root-causes").then(setRoots).catch(() => {});
+    api.get<AreaOption[]>("/api/areas").then(setAreas).catch(() => {});
   }, [params.id, load]);
 
   if (!analysis) return <p className="text-sm text-[#8A96A0]">Cargando…</p>;
@@ -100,7 +103,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
               <span className="ml-auto text-xs text-[#8A96A0]">{idxs.length} causa(s)</span>
             </div>
             {idxs.map(({ c, i }) => (
-              <CauseEditor key={i} index={i} cause={c} roots={roots} />
+              <CauseEditor key={i} index={i} cause={c} roots={roots} areas={areas} />
             ))}
             <button className="btn w-full justify-center border-dashed text-[#B9750F]"
               onClick={() => { addCause(cat as Categoria); setExpanded((p) => new Set(p).add(cat as Categoria)); }}>

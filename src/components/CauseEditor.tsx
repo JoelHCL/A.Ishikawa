@@ -2,15 +2,15 @@
 import { useEffect, useState } from "react";
 import { useAnalysisStore, type Cause } from "@/store/useAnalysisStore";
 import { api } from "@/lib/api";
-import type { RootCauseOption } from "@/app/(app)/analysis/[id]/page";
+import type { RootCauseOption, AreaOption } from "@/app/(app)/analysis/[id]/page";
 
 const MAX_SUBSUB = 5;
 
 type Recurrence = { apariciones: number; reincidente: boolean; analyses: { folio: string }[] };
 
 export default function CauseEditor({
-  index, cause, roots,
-}: { index: number; cause: Cause; roots: RootCauseOption[] }) {
+  index, cause, roots, areas,
+}: { index: number; cause: Cause; roots: RootCauseOption[]; areas: AreaOption[] }) {
   const {
     updateCause, removeCause, addSub, updateSub, removeSub,
     addSubSub, updateSubSub, removeSubSub,
@@ -74,6 +74,17 @@ export default function CauseEditor({
           <option value="">— sin ligar —</option>
           {roots.map((r) => (
             <option key={r.id} value={r.id}>{r.nombre} ({r.usos})</option>
+          ))}
+        </select>
+
+        <label className="text-xs font-semibold uppercase tracking-wide text-[#51606A]">
+          Área responsable
+        </label>
+        <select className="input max-w-[220px]" value={cause.areaId ?? ""}
+          onChange={(e) => updateCause(index, { areaId: e.target.value || null })}>
+          <option value="">— sin asignar —</option>
+          {areas.map((a) => (
+            <option key={a.id} value={a.id}>{a.nombre}</option>
           ))}
         </select>
 

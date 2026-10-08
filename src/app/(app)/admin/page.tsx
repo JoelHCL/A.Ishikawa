@@ -3,12 +3,15 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { CATEGORIA_LABEL, CATEGORIAS } from "@/lib/validation";
 
-type User = { id: string; email: string; name: string; role: string; active: boolean; lockedUntil: string | null; failedAttempts: number };
+type User = { id: string; email: string; name: string; role: string; active: boolean; lockedUntil: string | null; failedAttempts: number; twoFactorEnabled: boolean };
 type Root = { id: string; nombre: string; categoria: string; status: string; usos: number };
+type Area = { id: string; nombre: string; activa: boolean; usos: number };
 
 export default function Admin() {
   const [users, setUsers] = useState<User[]>([]);
   const [roots, setRoots] = useState<Root[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [naArea, setNaArea] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [tempPass, setTempPass] = useState<{ email: string; pass: string } | null>(null);
   const [nu, setNu] = useState({ email: "", name: "", password: "", role: "ANALYST" });
@@ -17,6 +20,7 @@ export default function Admin() {
   const reload = () => {
     api.get<User[]>("/api/users").then(setUsers).catch((e) => setError(e.message));
     api.get<Root[]>("/api/root-causes?all=1").then(setRoots).catch(() => {});
+    api.get<Area[]>("/api/areas?all=1").then(setAreas).catch(() => {});
   };
   useEffect(reload, []);
 
@@ -38,6 +42,13 @@ export default function Admin() {
   async function unlock(u: User) {
     setError(null);
     try { await api.patch(`/api/users/${u.id}`, { unlock: true }); reload(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  async function reset2fa(u: User) {
+    setError(null);
+    if (!confirm(`¿Borrar el 2FA de ${u.email}? Tendrá que volver a escanear el QR en su próximo inicio de sesión. Úsalo si perdió o cambió de celular.`)) return;
+    try { await api.patch(`/api/users/${u.id}`, { reset2fa: true }); reload(); }
     catch (e: any) { setError(e.message); }
   }
 
@@ -65,6 +76,24 @@ export default function Admin() {
     const extra = r.usos > 0 ? `\n\nOJO: está ligada a ${r.usos} causa(s) en análisis; esas causas quedarán "sin ligar" (los análisis NO se borran).` : "";
     if (!confirm(`¿Borrar la causa raíz "${r.nombre}" del catálogo?${extra}`)) return;
     try { await api.del(`/api/root-causes/${r.id}`); reload(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  async function createArea() {
+    setError(null);
+    try { await api.post("/api/areas", { nombre: naArea }); setNaArea(""); reload(); }
+    catch (e: any) { setError(e.message); }
+  }
+  async function toggleArea(a: Area) {
+    setError(null);
+    try { await api.patch(`/api/areas/${a.id}`, { activa: !a.activa }); reload(); }
+    catch (e: any) { setError(e.message); }
+  }
+  async function deleteArea(a: Area) {
+    setError(null);
+    const extra = a.usos > 0 ? `\n\nEstá ligada a ${a.usos} causa(s); esas causas quedarán "sin área" (los análisis NO se borran).` : "";
+    if (!confirm(`¿Borrar el área "${a.nombre}"?${extra}`)) return;
+    try { await api.del(`/api/areas/${a.id}`); reload(); }
     catch (e: any) { setError(e.message); }
   }
 
@@ -136,6 +165,11 @@ export default function Admin() {
                     <button className="btn py-1 text-xs" onClick={() => resetPass(u)}>
                       Resetear contraseña
                     </button>
+                    {u.twoFactorEnabled && (
+                      <button className="btn py-1 text-xs" onClick={() => reset2fa(u)}>
+                        Resetear 2FA
+                      </button>
+                    )}
                     {u.lockedUntil && new Date(u.lockedUntil) > new Date() && (
                       <button className="btn py-1 text-xs" onClick={() => unlock(u)}>
                         Desbloquear
@@ -145,6 +179,53 @@ export default function Admin() {
                 </td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card mb-5">
+        <h2 className="mb-1 font-semibold">Catálogo de áreas responsables</h2>
+        <p className="mb-3 text-sm text-[#8A96A0]">
+          Catálogo cerrado de áreas que se asignan a cada causa. Desactivar oculta un
+          área del selector sin borrar el historial; borrar la quita y las causas que
+          la usaban quedan &quot;sin área&quot;.
+        </p>
+        <div className="grid gap-2 md:grid-cols-3">
+          <input className="input md:col-span-2" placeholder="Nombre del área (ej. Producción, Almacén, Calidad)"
+            value={naArea} onChange={(e) => setNaArea(e.target.value)} />
+          <button className="btn btn-primary justify-center" onClick={createArea}>Agregar área</button>
+        </div>
+        <table className="mt-4 w-full text-sm">
+          <thead>
+            <tr className="text-left text-[11px] uppercase text-[#8A96A0]">
+              <th className="p-2">Área</th><th className="p-2">Usos</th>
+              <th className="p-2">Estado</th><th className="p-2">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {areas.map((a) => (
+              <tr key={a.id} className="border-t border-[#E5DECF] dark:border-[#2A3136]">
+                <td className="p-2">{a.nombre}</td>
+                <td className="p-2">{a.usos}</td>
+                <td className="p-2">
+                  <span className={a.activa ? "text-[#0F6E56]" : "text-[#A32D2D]"}>
+                    {a.activa ? "Activa" : "Inactiva"}
+                  </span>
+                </td>
+                <td className="p-2">
+                  <div className="flex gap-2">
+                    <button className="btn py-1 text-xs" onClick={() => toggleArea(a)}>
+                      {a.activa ? "Desactivar" : "Reactivar"}
+                    </button>
+                    <button className="btn py-1 text-xs hover:border-[#A32D2D] hover:text-[#A32D2D]"
+                      onClick={() => deleteArea(a)}>Borrar</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {!areas.length && (
+              <tr><td className="p-3 text-[#8A96A0]" colSpan={4}>Aún no hay áreas. Agrega las de tu planta.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
