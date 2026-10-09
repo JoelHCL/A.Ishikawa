@@ -54,6 +54,10 @@ export const causeSchema = z
     accion: z.string().nullable().optional(),
     responsable: z.string().nullable().optional(),
     fechaLimite: z.string().nullable().optional(),
+    // Fecha real de ejecución de la acción (AAAA-MM-DD). "" = sin fecha.
+    fechaEjecucion: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de ejecución inválida.")]).nullable().optional(),
+    // Referencia a un Archivo ya subido (la validez se comprueba en el PUT del análisis).
+    evidenciaArchivoId: z.string().nullable().optional(),
     rootCauseId: z.string().nullable().optional(),
     areaId: z.string().nullable().optional(),
     subCauses: z.array(subCauseSchema).default([]),
@@ -63,6 +67,11 @@ export const causeSchema = z
   .refine((c) => c.estado !== "VERIFICADA" || (c.evidencia?.trim().length ?? 0) > 0, {
     message: "Una causa VERIFICADA requiere evidencia o dato que la respalde.",
     path: ["evidencia"],
+  })
+  // La ejecución no puede ser anterior a la fecha en que se solicitó la acción.
+  .refine((c) => !c.fechaEjecucion || !c.fechaLimite || c.fechaEjecucion >= c.fechaLimite, {
+    message: "La fecha de ejecución no puede ser anterior a la fecha solicitada.",
+    path: ["fechaEjecucion"],
   })
   // Solo las causas verificadas generan acciones correctivas.
   .refine((c) => !c.accion?.trim() || c.estado === "VERIFICADA", {
@@ -77,6 +86,8 @@ export const analysisSchema = z.object({
   efecto: z.string().min(10, "El efecto debe ser concreto y medible (mín. 10 caracteres)."),
   participantes: z.string().nullable().optional(),
   status: z.enum(["BORRADOR", "EN_REVISION", "CERRADO"]).default("BORRADOR"),
+  // PDF de la no conformidad (referencia a un Archivo ya subido).
+  noConformidadArchivoId: z.string().nullable().optional(),
   causes: z.array(causeSchema).default([]),
 });
 

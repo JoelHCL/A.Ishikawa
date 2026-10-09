@@ -75,6 +75,15 @@ Tres reglas que **la base y el servidor imponen** (no dependen de la buena volun
   no aporta y sí añade complejidad. El esquema queda listo si algún día se necesita.
 - **Sin registro público ni recuperación por correo.** El admin da de alta y resetea.
 
+## Archivos adjuntos
+
+- Hay dos tipos: **evidencia de una causa VERIFICADA** (PDF/PNG/JPG/WEBP) y **PDF de la no conformidad** del análisis.
+- Se guardan en Postgres (tabla `archivos`), no en disco: el sistema de archivos de Vercel no persiste.
+  Tope de **4 MB** por archivo (el límite de cuerpo de una función en Vercel es ~4.5 MB).
+- El tipo se valida por el contenido del archivo, no por la extensión. Solo se entregan vía
+  `/api/archivos/[id]`, con sesión. La evidencia en texto sigue siendo obligatoria (candado 2); el archivo es adicional.
+- Cada causa verificada tiene **fecha solicitada** y **fecha de ejecución**; los días entre ambas se calculan al vuelo.
+
 ## Roles
 
 - **ADMIN** (Mesa de Control): usuarios, aprueba catálogo, ve y edita todo.

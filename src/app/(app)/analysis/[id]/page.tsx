@@ -5,6 +5,7 @@ import { CATEGORIA_LABEL, CATEGORIAS } from "@/lib/validation";
 import Fishbone from "@/components/Fishbone";
 import CauseEditor from "@/components/CauseEditor";
 import { api } from "@/lib/api";
+import ArchivoField from "@/components/ArchivoField";
 
 export type RootCauseOption = { id: string; nombre: string; categoria: string; usos: number };
 export type AreaOption = { id: string; nombre: string };
@@ -53,6 +54,20 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
             value={analysis.efecto} onChange={(e) => setHeader({ efecto: e.target.value })} />
         </div>
       </div>
+
+      {analysis.id && (
+        <div className="card mb-5">
+          <label className="label">No conformidad (PDF)</label>
+          <ArchivoField
+            analysisId={analysis.id}
+            tipo="NO_CONFORMIDAD"
+            accept="application/pdf"
+            valor={analysis.noConformidadArchivo}
+            onChange={(a) => setHeader({ noConformidadArchivo: a, noConformidadArchivoId: a?.id ?? null })}
+            ayuda="PDF de la no conformidad levantada para este análisis · máx. 4 MB. Se liga al pulsar Guardar cambios."
+          />
+        </div>
+      )}
 
       <div className="card mb-5">
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#51606A]">Diagrama</p>

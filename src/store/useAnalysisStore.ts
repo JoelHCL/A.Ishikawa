@@ -1,6 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import type { ArchivoRef } from "@/lib/archivosCliente";
 
 export type Categoria =
   | "MANO_DE_OBRA" | "METODO" | "MAQUINA"
@@ -17,6 +18,9 @@ export type Cause = {
   accion?: string | null;
   responsable?: string | null;
   fechaLimite?: string | null;
+  fechaEjecucion?: string | null;
+  evidenciaArchivoId?: string | null;
+  evidenciaArchivo?: ArchivoRef | null;
   rootCauseId?: string | null;
   areaId?: string | null;
   subCauses: Sub[];
@@ -28,6 +32,8 @@ export type Analysis = {
   efecto: string;
   participantes?: string | null;
   status: "BORRADOR" | "EN_REVISION" | "CERRADO";
+  noConformidadArchivoId?: string | null;
+  noConformidadArchivo?: ArchivoRef | null;
   causes: Cause[];
 };
 
@@ -72,6 +78,8 @@ export const useAnalysisStore = create<State>((set, get) => ({
           efecto: a.efecto,
           participantes: a.participantes,
           status: a.status,
+          noConformidadArchivoId: a.noConformidadArchivoId ?? null,
+          noConformidadArchivo: a.noConformidadArchivo ?? null,
           causes: (a.causes ?? []).map((c: any) => ({
             id: c.id,
             categoria: c.categoria,
@@ -81,6 +89,9 @@ export const useAnalysisStore = create<State>((set, get) => ({
             accion: c.accion,
             responsable: c.responsable,
             fechaLimite: c.fechaLimite ? String(c.fechaLimite).slice(0, 10) : null,
+            fechaEjecucion: c.fechaEjecucion ? String(c.fechaEjecucion).slice(0, 10) : null,
+            evidenciaArchivoId: c.evidenciaArchivoId ?? null,
+            evidenciaArchivo: c.evidenciaArchivo ?? null,
             rootCauseId: c.rootCauseId,
             areaId: c.areaId,
             subCauses: (c.subCauses ?? []).map((s: any) => ({

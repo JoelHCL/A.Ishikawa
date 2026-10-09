@@ -27,11 +27,13 @@ export async function GET(_req: Request, { params }: Ctx) {
       where: { id: params.id },
       include: {
         owner: { select: { name: true, email: true } },
+        noConformidadArchivo: { select: { id: true, nombre: true, mime: true, tamano: true } },
         causes: {
           orderBy: { orden: "asc" },
           include: {
             rootCause: { select: { id: true, nombre: true, status: true } },
             area: { select: { id: true, nombre: true } },
+            evidenciaArchivo: { select: { id: true, nombre: true, mime: true, tamano: true } },
             subCauses: {
               orderBy: { orden: "asc" },
               include: { subSubCauses: { orderBy: { orden: "asc" } } },
@@ -62,6 +64,18 @@ export async function PUT(req: Request, { params }: Ctx) {
     await loadOwned(params.id, s, true);
     const data = analysisSchema.parse(await req.json());
 
+    // Los archivos referenciados deben ser de ESTE análisis y del tipo correcto:
+    // si no, se podría ligar el archivo de otro análisis (o de otro tipo) por su id.
+    const evidenciaIds = Array.from(new Set(data.causes.map((c) => c.evidenciaArchivoId).filter((x): x is string => !!x)));
+    if (evidenciaIds.length) {
+      const n = await prisma.archivo.count({ where: { id: { in: evidenciaIds }, analysisId: params.id, tipo: "EVIDENCIA_CAUSA" } });
+      if (n !== evidenciaIds.length) throw new HttpError(422, "Una evidencia adjunta no pertenece a este análisis.");
+    }
+    if (data.noConformidadArchivoId) {
+      const existe = await prisma.archivo.count({ where: { id: data.noConformidadArchivoId, analysisId: params.id, tipo: "NO_CONFORMIDAD" } });
+      if (!existe) throw new HttpError(422, "El PDF de no conformidad no pertenece a este análisis.");
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       await tx.analysis.update({
         where: { id: params.id },
@@ -71,6 +85,7 @@ export async function PUT(req: Request, { params }: Ctx) {
           efecto: data.efecto,
           participantes: data.participantes ?? null,
           status: data.status,
+          noConformidadArchivoId: data.noConformidadArchivoId ?? null,
         },
       });
 
@@ -89,6 +104,9 @@ export async function PUT(req: Request, { params }: Ctx) {
             accion: c.estado === "VERIFICADA" ? c.accion ?? null : null,
             responsable: c.estado === "VERIFICADA" ? c.responsable ?? null : null,
             fechaLimite: c.fechaLimite ? new Date(c.fechaLimite) : null,
+            // Como acción y responsable: solo una causa VERIFICADA lleva ejecución y archivo.
+            fechaEjecucion: c.estado === "VERIFICADA" && c.fechaEjecucion ? new Date(c.fechaEjecucion) : null,
+            evidenciaArchivoId: c.estado === "VERIFICADA" ? c.evidenciaArchivoId ?? null : null,
             rootCauseId: c.rootCauseId ?? null,
             areaId: c.areaId ?? null,
             orden: i,

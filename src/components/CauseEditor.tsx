@@ -3,8 +3,19 @@ import { useEffect, useState } from "react";
 import { useAnalysisStore, type Cause } from "@/store/useAnalysisStore";
 import { api } from "@/lib/api";
 import type { RootCauseOption, AreaOption } from "@/app/(app)/analysis/[id]/page";
+import ArchivoField from "@/components/ArchivoField";
 
 const MAX_SUBSUB = 5;
+
+// Días entre dos fechas AAAA-MM-DD. Se calcula en UTC para que el cambio de
+// horario o la zona del navegador no sumen ni resten un día.
+const aUTC = (f: string) => { const [y, m, d] = f.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+const diasEntre = (desde: string, hasta: string) => Math.round((aUTC(hasta) - aUTC(desde)) / 86400000);
+const hoyLocal = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+};
+const plural = (n: number) => (n === 1 ? "1 día" : `${n} días`);
 
 type Recurrence = { apariciones: number; reincidente: boolean; analyses: { folio: string }[] };
 
@@ -13,7 +24,7 @@ export default function CauseEditor({
 }: { index: number; cause: Cause; roots: RootCauseOption[]; areas: AreaOption[] }) {
   const {
     updateCause, removeCause, addSub, updateSub, removeSub,
-    addSubSub, updateSubSub, removeSubSub,
+    addSubSub, updateSubSub, removeSubSub, analysis,
   } = useAnalysisStore();
 
   const [rec, setRec] = useState<Recurrence | null>(null);
@@ -101,14 +112,63 @@ export default function CauseEditor({
       </div>
 
       {verificada && (
-        <div className="mt-2 grid gap-2 md:grid-cols-3">
-          <input className="input" placeholder="Acción correctiva" value={cause.accion ?? ""}
-            onChange={(e) => updateCause(index, { accion: e.target.value })} />
-          <input className="input" placeholder="Responsable" value={cause.responsable ?? ""}
-            onChange={(e) => updateCause(index, { responsable: e.target.value })} />
-          <input className="input" type="date" value={cause.fechaLimite ?? ""}
-            onChange={(e) => updateCause(index, { fechaLimite: e.target.value })} />
-        </div>
+        <>
+          <div className="mt-2 grid gap-2 md:grid-cols-4">
+            <div>
+              <label className="label">Acción correctiva</label>
+              <input className="input" placeholder="Acción correctiva" value={cause.accion ?? ""}
+                onChange={(e) => updateCause(index, { accion: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Responsable</label>
+              <input className="input" placeholder="Responsable" value={cause.responsable ?? ""}
+                onChange={(e) => updateCause(index, { responsable: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Fecha solicitada</label>
+              <input className="input" type="date" value={cause.fechaLimite ?? ""}
+                onChange={(e) => updateCause(index, { fechaLimite: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Fecha de ejecución</label>
+              <input className="input" type="date" min={cause.fechaLimite || undefined}
+                value={cause.fechaEjecucion ?? ""}
+                onChange={(e) => updateCause(index, { fechaEjecucion: e.target.value })} />
+            </div>
+          </div>
+
+          {cause.fechaLimite && (() => {
+            if (cause.fechaEjecucion) {
+              const n = diasEntre(cause.fechaLimite, cause.fechaEjecucion);
+              if (n < 0) return <p className="mt-1 text-xs text-[#A32D2D]">La ejecución es anterior a la fecha solicitada.</p>;
+              return (
+                <p className="mt-1 text-xs font-semibold text-[#0F6E56]">
+                  {n === 0 ? "Ejecutada el mismo día de la solicitud." : `Ejecutada ${plural(n)} después de la solicitud.`}
+                </p>
+              );
+            }
+            const n = diasEntre(cause.fechaLimite, hoyLocal());
+            return n >= 0 ? (
+              <p className="mt-1 text-xs font-semibold text-[#B9750F]">
+                Sin ejecutar · {plural(n)} desde la solicitud.
+              </p>
+            ) : null;
+          })()}
+
+          {analysis?.id && (
+            <div className="mt-2">
+              <label className="label">Archivo de evidencia (opcional)</label>
+              <ArchivoField
+                analysisId={analysis.id}
+                tipo="EVIDENCIA_CAUSA"
+                accept="application/pdf,image/png,image/jpeg,image/webp"
+                valor={cause.evidenciaArchivo}
+                onChange={(a) => updateCause(index, { evidenciaArchivo: a, evidenciaArchivoId: a?.id ?? null })}
+                ayuda="PDF, PNG, JPG o WEBP · máx. 4 MB. Se liga a la causa al pulsar Guardar cambios."
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Sub-causas y sub-sub-causas */}

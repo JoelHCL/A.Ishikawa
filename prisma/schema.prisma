@@ -66,6 +66,7 @@ model User {
   analyses          Analysis[]  @relation("AnalysisOwner")
   logs              AuditLog[]
   rootCausesCreated RootCause[] @relation("RootCauseCreator")
+  archivos          Archivo[]
 
   @@map("users")
 }
@@ -107,6 +108,12 @@ model Analysis {
   causes Cause[]
   logs   AuditLog[]
 
+  // PDF de la no conformidad que se levantó para este análisis.
+  noConformidadArchivoId String?
+  noConformidadArchivo   Archivo? @relation("NoConformidad", fields: [noConformidadArchivoId], references: [id], onDelete: SetNull)
+
+  archivos Archivo[] @relation("ArchivosDelAnalisis")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -138,7 +145,10 @@ model Cause {
   evidencia   String? // OBLIGATORIA si estado = VERIFICADA (validado con Zod en el servidor)
   accion      String? // solo tiene sentido si VERIFICADA
   responsable String?
-  fechaLimite DateTime?
+  fechaLimite DateTime? // fecha en que se solicita la acción
+  // Fecha real en que se ejecutó la acción. Los días transcurridos se calculan
+  // al vuelo (ejecución - solicitud); no se guardan para que no puedan desfasarse.
+  fechaEjecucion DateTime?
   orden       Int       @default(0)
 
   analysisId String
@@ -153,8 +163,15 @@ model Cause {
   areaId String?
   area   Area?   @relation(fields: [areaId], references: [id], onDelete: SetNull)
 
+  // Archivo de evidencia (PDF/imagen) de una causa VERIFICADA. El archivo vive en
+  // la tabla Archivo y aquí solo va la referencia: el PUT del análisis reemplaza
+  // todo el árbol de causas y el archivo debe sobrevivir a ese reemplazo.
+  evidenciaArchivoId String?
+  evidenciaArchivo   Archivo? @relation("EvidenciaCausa", fields: [evidenciaArchivoId], references: [id], onDelete: SetNull)
+
   subCauses SubCause[]
 
+  @@index([evidenciaArchivoId])
   @@index([analysisId, categoria])
   @@index([rootCauseId])
   @@index([areaId])
@@ -201,4 +218,37 @@ model AuditLog {
 
   @@index([analysisId, createdAt])
   @@map("audit_logs")
+}
+
+// ---------- ARCHIVOS ADJUNTOS ----------
+// Se guardan en Postgres (no en disco) porque el despliegue es Vercel + Neon y
+// el sistema de archivos de Vercel no persiste. Tope de 4 MB por archivo (el
+// límite de cuerpo de una función en Vercel es ~4.5 MB). Nunca se sirven
+// públicamente: solo vía /api/archivos/[id], con sesión.
+enum ArchivoTipo {
+  EVIDENCIA_CAUSA // foto o PDF que respalda una causa VERIFICADA
+  NO_CONFORMIDAD // PDF de la no conformidad ligada al análisis
+}
+
+model Archivo {
+  id     String      @id @default(cuid())
+  tipo   ArchivoTipo
+  nombre String
+  mime   String // validado por contenido (magic bytes), nunca el que declara el cliente
+  tamano Int
+  datos  Bytes
+
+  analysisId String
+  analysis   Analysis @relation("ArchivosDelAnalisis", fields: [analysisId], references: [id], onDelete: Cascade)
+
+  subidoPorId String
+  subidoPor   User   @relation(fields: [subidoPorId], references: [id], onDelete: Cascade)
+
+  causasEvidencia Cause[]    @relation("EvidenciaCausa")
+  noConformidades Analysis[] @relation("NoConformidad")
+
+  createdAt DateTime @default(now())
+
+  @@index([analysisId, tipo])
+  @@map("archivos")
 }
